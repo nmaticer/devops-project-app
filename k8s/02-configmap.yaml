@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ticketing-config
+  namespace: ticketing
+data:
+  POSTGRES_HOST: "postgres"
+  POSTGRES_PORT: "5432"
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+  QUEUE_NAME: "ticket_orders"
+  API_PORT: "8080"
+  FRONTEND_PORT: "3000"
+  NODE_ENV: "production"
+  # Browser zove API kroz Ingress na /api putanji (server.js skida /api prefiks)
+  API_BASE_URL: "http://ticketing.local/api"

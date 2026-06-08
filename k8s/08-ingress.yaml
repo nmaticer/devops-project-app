@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ticketing-ingress
+  namespace: ticketing
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+    - host: ticketing.local
+      http:
+        paths:
+          # /api -> API servis (server.js skida /api prefiks)
+          - path: /api
+            pathType: Prefix
+            backend:
+              service: { name: api, port: { number: 8080 } }
+          # sve ostalo -> frontend
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: frontend, port: { number: 3000 } }

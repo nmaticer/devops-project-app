@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: ticketing
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: api } }
+  template:
+    metadata:
+      labels: { app: api }
+    spec:
+      serviceAccountName: ticketing-sa
+      automountServiceAccountToken: false
+      containers:
+        - name: api
+          # ZAMIJENI <GHCR_USER> svojim GitHub korisnikom
+          image: ghcr.io/<GHCR_USER>/ticketing-api:v1.0.0
+          imagePullPolicy: IfNotPresent
+          ports: [{ containerPort: 8080 }]
+          envFrom:
+            - configMapRef: { name: ticketing-config }
+          env:
+            - name: POSTGRES_USER
+              valueFrom: { secretKeyRef: { name: ticketing-db-secret, key: POSTGRES_USER } }
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: ticketing-db-secret, key: POSTGRES_PASSWORD } }
+            - name: POSTGRES_DB
+              valueFrom: { secretKeyRef: { name: ticketing-db-secret, key: POSTGRES_DB } }
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          readinessProbe:
+            httpGet: { path: /readyz, port: 8080 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests: { cpu: "100m", memory: "96Mi" }
+            limits:   { cpu: "300m", memory: "192Mi" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+  namespace: ticketing
+spec:
+  selector: { app: api }
+  ports: [{ port: 8080, targetPort: 8080 }]

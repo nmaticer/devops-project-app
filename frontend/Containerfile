@@ -1,0 +1,31 @@
+# Multi-stage build za frontend servis
+FROM node:22-alpine AS base
+WORKDIR /app
+COPY package.json package-lock.json ./
+
+FROM base AS deps-prod
+RUN npm ci --omit=dev
+
+FROM base AS deps-dev
+RUN npm ci
+
+# --- DEV: hot-reload (samo lokalno) ---
+FROM node:22-alpine AS dev
+ENV NODE_ENV=development
+WORKDIR /app
+COPY --from=deps-dev /app/node_modules ./node_modules
+COPY package.json ./
+COPY src ./src
+EXPOSE 3000
+CMD ["npm", "run", "dev"]
+
+# --- RUNTIME: minimalna, non-root produkcijska slika ---
+FROM node:22-alpine AS runtime
+ENV NODE_ENV=production
+WORKDIR /app
+COPY --from=deps-prod --chown=node:node /app/node_modules ./node_modules
+COPY --chown=node:node package.json ./
+COPY --chown=node:node src ./src
+USER node
+EXPOSE 3000
+CMD ["node", "src/server.js"]

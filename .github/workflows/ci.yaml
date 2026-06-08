@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/ticketing
+  VERSION: "1.0.0"          # semver oznaka; SHA se dodaje automatski
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: Install & syntax check (api, frontend, worker)
+        run: |
+          for s in api frontend worker; do
+            echo "== $s =="
+            (cd "$s" && npm ci && node --check src/*.js)
+          done
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trivy secret scan (repozitorij)
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: fs
+          scanners: secret
+          scan-ref: .
+          exit-code: '1'
+          severity: CRITICAL,HIGH
+
+  build-scan-push:
+    needs: [ lint-and-test, secret-scan ]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        service: [ api, frontend, worker ]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set tags
+        id: tags
+        run: |
+          SHA=$(git rev-parse --short HEAD)
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "image=${IMAGE_PREFIX}-${{ matrix.service }}" >> "$GITHUB_OUTPUT"
+
+      - name: Build image (runtime stage)
+        run: |
+          docker build -f ${{ matrix.service }}/Containerfile \
+            --target runtime \
+            -t ${{ steps.tags.outputs.image }}:${{ steps.tags.outputs.sha }} \
+            -t ${{ steps.tags.outputs.image }}:v${VERSION} \
+            ${{ matrix.service }}
+
+      - name: Trivy image scan (quality gate CRITICAL+HIGH)
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: ${{ steps.tags.outputs.image }}:${{ steps.tags.outputs.sha }}
+          exit-code: '1'
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push image (samo ako je scan prošao)
+        run: |
+          docker push ${{ steps.tags.outputs.image }}:${{ steps.tags.outputs.sha }}
+          docker push ${{ steps.tags.outputs.image }}:v${VERSION}
