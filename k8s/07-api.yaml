@@ -15,7 +15,7 @@ spec:
       containers:
         - name: api
           # ZAMIJENI <GHCR_USER> svojim GitHub korisnikom
-          image: ghcr.io/<GHCR_USER>/ticketing-api:v1.0.0
+          image: ticketing-api:v1.0.0
           imagePullPolicy: IfNotPresent
           ports: [{ containerPort: 8080 }]
           envFrom:
