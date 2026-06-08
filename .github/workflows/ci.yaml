@@ -8,7 +8,8 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/ticketing
-  VERSION: "1.0.0"          # semver oznaka; SHA se dodaje automatski
+  VERSION: "1.0.0"
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   lint-and-test:
@@ -16,7 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: '22' }
+        with: { node-version: "22" }
       - name: Install & syntax check (api, frontend, worker)
         run: |
           for s in api frontend worker; do
@@ -29,12 +30,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Trivy secret scan (repozitorij)
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scanners: secret
           scan-ref: .
-          exit-code: '1'
+          exit-code: "1"
           severity: CRITICAL,HIGH
 
   build-scan-push:
@@ -65,10 +66,10 @@ jobs:
             ${{ matrix.service }}
 
       - name: Trivy image scan (quality gate CRITICAL+HIGH)
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ steps.tags.outputs.image }}:${{ steps.tags.outputs.sha }}
-          exit-code: '1'
+          exit-code: "1"
           severity: CRITICAL,HIGH
           ignore-unfixed: true
 
@@ -79,7 +80,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Push image (samo ako je scan prošao)
+      - name: Push image (samo ako je scan prosao)
         run: |
           docker push ${{ steps.tags.outputs.image }}:${{ steps.tags.outputs.sha }}
           docker push ${{ steps.tags.outputs.image }}:v${VERSION}
